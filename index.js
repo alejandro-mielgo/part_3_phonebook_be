@@ -7,6 +7,7 @@ const cors = require('cors')
 const app = express()
 app.use(express.json())
 app.use(cors())
+app.use(express.static('dist'))
 
 
 app.use(morgan(function (tokens, request, response) {
@@ -47,6 +48,10 @@ let contacts = [
       "number": "39-23-6423122"
     }
 ]
+
+app.get('/', (request,response)=>{
+    response.send('<h1>Phonebook</h1><p>full stack open exercise</>')
+})
 
 app.get('/info', (request, response)=>{ //Get info
 
