@@ -1,17 +1,18 @@
-console.log("Agenda telefonica back end")
-
+require('dotenv').config()
 const express = require('express')
 const morgan = require('morgan')
 const cors = require('cors')
 
+const Contact = require('./models/contact')
 const app = express()
+
 app.use(express.json())
 app.use(cors())
 app.use(express.static('dist'))
 
 
 app.use(morgan(function (tokens, request, response) {
-    console.log(response.body)
+    console.log("response body", response.body)
 
     return [
       tokens.method(request, response),
@@ -23,82 +24,80 @@ app.use(morgan(function (tokens, request, response) {
     ].join(' ')
   }))
 
-
-
-
-let contacts = [ 
-    { 
-      "id": 1,
-      "name": "Arto Hellas", 
-      "number": "040-123456"
-    },
-    { 
-      "id": 2,
-      "name": "Ada Lovelace", 
-      "number": "39-44-5323523"
-    },
-    { 
-      "id": 3,
-      "name": "Dan Abramov", 
-      "number": "12-43-234345"
-    },
-    { 
-      "id": 4,
-      "name": "Mary Poppendieck", 
-      "number": "39-23-6423122"
-    }
-]
-
 app.get('/', (request,response)=>{
     response.send('<h1>Phonebook</h1><p>full stack open exercise</>')
 })
 
-app.get('/info', (request, response)=>{ //Get info
-
-    const nContacts =  contacts.length
-    const date = new Date()
-    console.log(nContacts)
-    console.log(date)
-    const l1 = '<h1>Phonebook</h1>'
-    const l2 = `<p>Phonebook has info for ${nContacts} people</p>`
-    const l3 = String(date)
-    response.send(l1+l2+l3)
-    
-   
+app.get('/info', (request, response, next)=>{ //Get info
+    Contact.find().then((contacts) =>{
+        const nContacts = contacts.length 
+        console.log("contacts", contacts.length)
+        const date = new Date()
+        console.log(nContacts)
+        console.log(date)
+        const l1 = '<h1>Phonebook</h1>'
+        const l2 = `<p>Phonebook has info for ${nContacts} people</p>`
+        const l3 = String(date)
+        response.send(l1+l2+l3)
+    }).catch(error =>  next(error))
 })
+
 app.get('/api/persons', (request, response) =>{ //get all
-    response.json(contacts)
-})
-app.get('/api/persons/:id', (request, response) =>{  //get one
-    const id = Number( request.params.id )
-    const contact = contacts.filter(person => person.id===id)
-    console.log(id)
-    console.log(contact.id)
-    response.json(contact)
+    Contact.find().then((contacts) =>{
+        response.json(contacts)  //esto es lo que devuelve 
+    }).catch(error =>  next(error))
 })
 
-app.post('/api/persons', (request,response) => { //add contact
+app.get('/api/persons/:id', (request, response,next) =>{  //get one
+    Contact.findById(request.params.id)
+        .then(contact => {
+            if (contact){
+                response.json(contact)
+            } else {
+                response.status(404).end()
+            }
+        })
+        .catch(error => next(error))
+
+})
+
+app.post('/api/persons', (request,response,next) => { //add contact
     const body = request.body
-    const [isBodyValid,message] =  validateContent(body, contacts)
+    // const [isBodyValid,message] =  validateContent(body, contacts)
     
-    if(!isBodyValid){
-        return response.json({error:message})
-    }
-    const contact = {
+    // if(!isBodyValid){
+    //     return response.json({error:message})
+    // }
+    const newContact = new Contact({
         name : body.name,
         number: body.number,
-        id: generateId()
-    }
-    contacts = contacts.concat(contact)
-    return response.json(contact)
+    })
+    newContact.save().then(savedContact =>{
+        response.json(savedContact)
+    }).catch(error => next(error))
 })
 
-app.delete('/api/persons/:id', (request,response)=>{ //delete one
-    const id = Number(request.params.id)
-    console.log(id)
-    contacts = contacts.filter(person => person.id!==id )
-    response.status(204).end()
+app.delete('/api/persons/:id', (request,response, next )=>{ //delete one
+    Contact.findByIdAndDelete(request.params.id)
+        .then(response.status(204).end())
+        .catch( error => next(error))
 })
+
+app.put('/api/persons/:id', (request, response, next) => {
+    const body = request.body
+    const contact = {
+        name: body.name,
+        number: body.number
+    }
+    console.log("updated contact", contact)
+    Contact.findByIdAndUpdate(request.params.id, contact)
+        .then(updatedContact => {
+            response.json(updatedContact)
+        })
+        .catch(error => next(error))
+
+}) 
+
 
 const validateContent = (person, existingPersons) => {
     const namesArray = existingPersons.map(person =>person.name)
@@ -116,11 +115,17 @@ const validateContent = (person, existingPersons) => {
 }
 
 
+const errorHandler = (error, request, response, next) => {
+    console.error(error.message)
 
-const generateId = () => {
-    return Math.floor(Math.random()*1000000)
-  }
+    if (error.name === 'CastError') {
+        return response.status(400).send({ error: 'malformatted id' })
+    } 
 
+    next(error)
+}
+
+app.use(errorHandler)
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, ()=>{
