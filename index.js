@@ -63,11 +63,6 @@ app.get('/api/persons/:id', (request, response,next) =>{  //get one
 
 app.post('/api/persons', (request,response,next) => { //add contact
     const body = request.body
-    // const [isBodyValid,message] =  validateContent(body, contacts)
-    
-    // if(!isBodyValid){
-    //     return response.json({error:message})
-    // }
     const newContact = new Contact({
         name : body.name,
         number: body.number,
@@ -120,7 +115,9 @@ const errorHandler = (error, request, response, next) => {
 
     if (error.name === 'CastError') {
         return response.status(400).send({ error: 'malformatted id' })
-    } 
+    } else if (error.name ==="ValidationError"){
+        return response.status(400).json({error: error.message})
+    }
 
     next(error)
 }
